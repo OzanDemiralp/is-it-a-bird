@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import aircraft, health
+from .api import aircraft, details, health
 from .core import config
 from .core.handlers import register_exception_handlers
 
@@ -19,3 +19,4 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(health.router)
 app.include_router(aircraft.router)
+app.include_router(details.router)

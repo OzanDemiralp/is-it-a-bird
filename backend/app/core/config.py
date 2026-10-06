@@ -22,3 +22,9 @@ CACHE_TTL_SECONDS: float = float(os.getenv("CACHE_TTL_SECONDS", "5"))
 # Optional OpenSky OAuth2 client credentials. Without them, anonymous (reduced) limits apply.
 OPENSKY_CLIENT_ID: str | None = os.getenv("OPENSKY_CLIENT_ID") or None
 OPENSKY_CLIENT_SECRET: str | None = os.getenv("OPENSKY_CLIENT_SECRET") or None
+
+# How long (seconds) to remember that adsbdb has no data for a callsign / aircraft.
+DETAILS_UNKNOWN_TTL_SECONDS: float = float(os.getenv("DETAILS_UNKNOWN_TTL_SECONDS", "3600"))
+
+# How long (seconds) aircraft details (type, registration, owner, photo) are cached.
+AIRCRAFT_INFO_TTL_SECONDS: float = float(os.getenv("AIRCRAFT_INFO_TTL_SECONDS", "86400"))

@@ -69,6 +69,39 @@ class OpenSkyAuthError(AppError):
     default_message = "Authentication with OpenSky failed"
 
 
+# --- adsbdb (route / aircraft details) errors ---------------------------------------------------
+
+
+class AdsbdbRateLimitedError(AppError):
+    status_code = 429
+    code = "ADSBDB_RATE_LIMITED"
+    default_message = "adsbdb rate limit reached; try again later"
+
+
+class AdsbdbTimeoutError(AppError):
+    status_code = 504
+    code = "ADSBDB_TIMEOUT"
+    default_message = "adsbdb did not respond in time"
+
+
+class AdsbdbUnreachableError(AppError):
+    status_code = 502
+    code = "ADSBDB_UNREACHABLE"
+    default_message = "Could not reach adsbdb"
+
+
+class AdsbdbBadResponseError(AppError):
+    status_code = 502
+    code = "ADSBDB_BAD_RESPONSE"
+    default_message = "adsbdb returned an unexpected HTTP status"
+
+
+class AdsbdbInvalidDataError(AppError):
+    status_code = 502
+    code = "ADSBDB_INVALID_DATA"
+    default_message = "adsbdb returned invalid or unexpected data"
+
+
 # --- Request / generic errors ------------------------------------------------------------------
 
 
