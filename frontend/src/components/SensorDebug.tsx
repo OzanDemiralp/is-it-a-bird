@@ -8,6 +8,7 @@ import {
   type ProviderChoice,
   type SensorStatus,
 } from '../sensors'
+import { CameraPreview } from './CameraPreview'
 
 type Active = Extract<ProviderChoice, { ok: true }>
 
@@ -21,6 +22,7 @@ export function SensorDebug() {
   const [sample, setSample] = useState<PointingSample | null>(null)
   const [recorder, setRecorder] = useState<SensorRecorder | null>(null)
   const [recording, setRecording] = useState(false)
+  const [recordingLabel, setRecordingLabel] = useState('')
 
   const observerRef = useRef<ObserverPosition | null>(null)
   const teardownRef = useRef<(() => void) | null>(null)
@@ -87,14 +89,17 @@ export function SensorDebug() {
     if (recorder.isRecording) {
       const data = recorder.stop()
       setRecording(false)
-      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `sensor-recording-${data.startedAt.replace(/[:.]/g, '-')}.json`
+      const safeLabel = data.label
+        ? `-${data.label.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '')}`
+        : ''
+      link.download = `sensor-recording${safeLabel}-${data.startedAt.replace(/[:.]/g, '-')}.json`
       link.click()
       URL.revokeObjectURL(link.href)
     } else {
-      recorder.start(observerRef.current)
+      recorder.start(observerRef.current, recordingLabel)
       setRecording(true)
     }
   }
@@ -105,6 +110,9 @@ export function SensorDebug() {
     if (!file) return
     try {
       const data = parseRecording(await file.text())
+      if (data.label) {
+        setRecordingLabel(data.label)
+      }
       activate(createOrientationProvider({ getObserver: () => null, force: 'replay', recording: data }))
     } catch (e) {
       activate({ ok: false, reason: e instanceof Error ? e.message : 'Could not read recording.' })
@@ -114,6 +122,9 @@ export function SensorDebug() {
   return (
     <main className="app">
       <h1>Sensor debug</h1>
+
+      {/* Camera preview with optical axis crosshair and high-contrast outdoor readout */}
+      <CameraPreview sample={sample} />
 
       <form className="observer-form" onSubmit={(e) => e.preventDefault()}>
         <label>
@@ -163,11 +174,24 @@ export function SensorDebug() {
       {active?.kind === 'fake' && <FakeControls provider={active.provider} />}
 
       <h2>Record / replay</h2>
-      <p>
-        <button id="sensor-record" type="button" onClick={toggleRecording} disabled={!recorder}>
-          {recording ? `Stop & download (${recorder?.count ?? 0} samples)` : 'Start recording'}
-        </button>
-      </p>
+      <div className="record-form">
+        <label htmlFor="sensor-recording-label">
+          Landmark label (optional)
+          <input
+            id="sensor-recording-label"
+            type="text"
+            value={recordingLabel}
+            onChange={(e) => setRecordingLabel(e.target.value)}
+            placeholder="e.g. Uetliberg tower"
+            disabled={recording}
+          />
+        </label>
+        <p>
+          <button id="sensor-record" type="button" onClick={toggleRecording} disabled={!recorder}>
+            {recording ? `Stop & download (${recorder?.count ?? 0} samples)` : 'Start recording'}
+          </button>
+        </p>
+      </div>
       <label>
         Replay a recording{' '}
         <input id="sensor-replay-file" type="file" accept="application/json" onChange={handleReplayFile} />

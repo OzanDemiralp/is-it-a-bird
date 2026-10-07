@@ -29,6 +29,186 @@
   color: #b00020;
 }
 
+/* Camera preview & viewfinder */
+.camera-section {
+  width: 100%;
+  margin: 16px 0 24px;
+}
+
+.camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.camera-status-pill {
+  font-size: 13px;
+  font-weight: 600;
+  color: #22c55e;
+  letter-spacing: 0.5px;
+}
+
+.camera-error {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(176, 0, 32, 0.1);
+  border: 1px solid rgba(176, 0, 32, 0.4);
+  border-radius: 4px;
+}
+
+.camera-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 65vh;
+  background-color: #0b0c10;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.camera-viewport.idle {
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+}
+
+/* Rear camera video element - cropped symmetrically with object-fit: cover so center stays optical center */
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-placeholder {
+  padding: 24px;
+  text-align: center;
+  color: var(--text);
+}
+
+.camera-hint {
+  font-size: 14px;
+  margin-top: 6px;
+  color: #888;
+}
+
+/* Optical axis crosshair */
+.camera-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140px;
+  height: 140px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.crosshair-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* High-contrast outdoor HUD readout directly on the camera preview */
+.camera-overlay-readout {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.camera-overlay-chip {
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.camera-overlay-lbl {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.camera-overlay-val {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Outdoor readout banner directly under the preview */
+.outdoor-readout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  background: #0f1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.outdoor-readout-stat {
+  text-align: center;
+  padding: 4px;
+}
+
+.outdoor-readout-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+
+.outdoor-readout-num {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+/* Record controls with landmark label */
+.record-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.record-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.record-form input {
+  max-width: 320px;
+  padding: 6px 8px;
+}
+
 .aircraft-table {
   width: 100%;
   border-collapse: collapse;
@@ -40,3 +220,4 @@
   border-bottom: 1px solid #8884;
   text-align: left;
 }
+

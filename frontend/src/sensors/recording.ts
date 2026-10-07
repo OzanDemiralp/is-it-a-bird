@@ -7,6 +7,8 @@ export interface SensorRecording {
   provider: string
   startedAt: string
   observer: ObserverPosition | null
+  /** Optional landmark or target label saved with the recording. */
+  label?: string
   samples: RawOrientationSample[]
 }
 
@@ -17,7 +19,8 @@ export function isSensorRecording(value: unknown): value is SensorRecording {
     v !== null &&
     v.version === 1 &&
     Array.isArray(v.samples) &&
-    v.samples.every((s) => typeof s?.timestamp === 'number')
+    v.samples.every((s) => typeof s?.timestamp === 'number') &&
+    (v.label === undefined || typeof v.label === 'string')
   )
 }
 
@@ -31,6 +34,7 @@ export function parseRecording(json: string): SensorRecording {
 export class SensorRecorder {
   private samples: RawOrientationSample[] = []
   private observer: ObserverPosition | null = null
+  private label?: string
   private startedAt = ''
   private active = false
 
@@ -48,25 +52,36 @@ export class SensorRecorder {
     return this.samples.length
   }
 
-  start(observer: ObserverPosition | null): void {
+  get currentLabel(): string | undefined {
+    return this.label
+  }
+
+  start(observer: ObserverPosition | null, label?: string): void {
     this.samples = []
     this.observer = observer
+    const trimmed = label?.trim()
+    this.label = trimmed ? trimmed : undefined
     this.startedAt = new Date().toISOString()
     this.active = true
   }
 
   stop(): SensorRecording {
     this.active = false
-    return {
+    const recording: SensorRecording = {
       version: 1,
       provider: this.providerName,
       startedAt: this.startedAt,
       observer: this.observer,
       samples: this.samples,
     }
+    if (this.label) {
+      recording.label = this.label
+    }
+    return recording
   }
 
   push(raw: RawOrientationSample): void {
     if (this.active) this.samples.push(raw)
   }
 }
+
