@@ -25,9 +25,22 @@ def test_route_tolerates_missing_parts():
     assert route.destination is None
 
 
-def test_route_without_callsign_is_invalid():
-    with pytest.raises(AdsbdbInvalidDataError):
-        map_flightroute({"origin": {}})
+def test_route_tolerates_missing_callsign():
+    route = map_flightroute({"origin": {"municipality": "Seoul"}})
+    assert route.callsign is None
+    assert route.origin.city == "Seoul"
+    assert route.airline is None
+    assert route.destination is None
+
+
+def test_empty_strings_map_to_none():
+    route = map_flightroute({"callsign": "", "airline": {"name": ""}})
+    assert route.callsign is None
+    assert route.airline.name is None
+
+    info = map_aircraft({"registration": "", "type": ""})
+    assert info.registration is None
+    assert info.type is None
 
 
 def test_route_with_wrongly_typed_field_is_invalid():

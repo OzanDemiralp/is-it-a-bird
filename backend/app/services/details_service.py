@@ -2,6 +2,7 @@ import asyncio
 
 from ..clients.adsbdb_client import AdsbdbClient
 from ..core.cache import MISS, TTLCache
+from ..core.errors import AdsbdbRateLimitedError
 from ..schemas.details import AircraftDetails, AircraftInfo, FlightRoute
 from .details_mapper import map_aircraft, map_flightroute
 from .route_ttl import route_ttl_seconds
@@ -36,12 +37,32 @@ class DetailsService:
         lon: float | None = None,
         velocity: float | None = None,
     ) -> AircraftDetails:
-        # Both lookups are independent, so run them concurrently. If either fails, the
-        # AppError propagates and the global handler reports it.
-        route, aircraft = await asyncio.gather(
+        # Both lookups are independent, so run them concurrently. If one lookup fails
+        # with an error but the other returns data, return the partial data received
+        # instead of raising an error.
+        route_res, aircraft_res = await asyncio.gather(
             self._route(callsign, lat, lon, velocity),
             self._aircraft(icao24),
+            return_exceptions=True,
         )
+
+        route_exc = route_res if isinstance(route_res, Exception) else None
+        aircraft_exc = aircraft_res if isinstance(aircraft_res, Exception) else None
+
+        route = None if route_exc else route_res
+        aircraft = None if aircraft_exc else aircraft_res
+
+        # If both lookups resulted in no data and at least one raised an exception, propagate.
+        if route is None and aircraft is None:
+            if isinstance(route_exc, AdsbdbRateLimitedError):
+                raise route_exc
+            if isinstance(aircraft_exc, AdsbdbRateLimitedError):
+                raise aircraft_exc
+            if route_exc:
+                raise route_exc
+            if aircraft_exc:
+                raise aircraft_exc
+
         return AircraftDetails(route=route, aircraft=aircraft)
 
     async def _route(

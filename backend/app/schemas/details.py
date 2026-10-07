@@ -21,7 +21,7 @@ class Airline(BaseModel):
 
 
 class FlightRoute(BaseModel):
-    callsign: str
+    callsign: str | None = None
     airline: Airline | None = None
     origin: Airport | None = None
     destination: Airport | None = None

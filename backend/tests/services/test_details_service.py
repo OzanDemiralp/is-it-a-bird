@@ -13,23 +13,34 @@ AIRCRAFT_TTL = 86400.0
 
 
 class FakeClient:
-    def __init__(self, route=ROUTE_JSON, aircraft=AIRCRAFT_JSON, error=None):
+    def __init__(
+        self,
+        route=ROUTE_JSON,
+        aircraft=AIRCRAFT_JSON,
+        error=None,
+        route_error=None,
+        aircraft_error=None,
+    ):
         self.route = route
         self.aircraft = aircraft
         self.error = error
+        self.route_error = route_error
+        self.aircraft_error = aircraft_error
         self.route_calls: list[str] = []
         self.aircraft_calls: list[str] = []
 
     async def fetch_flightroute(self, callsign):
         self.route_calls.append(callsign)
-        if self.error:
-            raise self.error
+        err = self.route_error or self.error
+        if err:
+            raise err
         return self.route
 
     async def fetch_aircraft(self, icao24):
         self.aircraft_calls.append(icao24)
-        if self.error:
-            raise self.error
+        err = self.aircraft_error or self.error
+        if err:
+            raise err
         return self.aircraft
 
 
@@ -138,3 +149,32 @@ def test_errors_propagate_and_are_not_cached():
 
     client.error = None
     assert run(service, "4b1805", "SWR123").route is not None
+
+
+def test_partial_data_route_error_still_returns_aircraft():
+    client = FakeClient(route_error=AdsbdbTimeoutError())
+    service, route_cache, aircraft_cache = make(client)
+    details = run(service, "4b1805", "SWR123")
+    assert details.route is None
+    assert details.aircraft is not None
+    assert details.aircraft.registration == "HB-JCN"
+    assert route_cache._items == {}
+    assert "4b1805" in aircraft_cache._items
+
+
+def test_partial_data_aircraft_error_still_returns_route():
+    client = FakeClient(aircraft_error=AdsbdbTimeoutError())
+    service, route_cache, aircraft_cache = make(client)
+    details = run(service, "4b1805", "SWR123")
+    assert details.route is not None
+    assert details.route.destination.iata == "ZRH"
+    assert details.aircraft is None
+    assert "SWR123" in route_cache._items
+    assert aircraft_cache._items == {}
+
+
+def test_no_callsign_and_aircraft_error_raises():
+    client = FakeClient(aircraft_error=AdsbdbTimeoutError())
+    service, _, _ = make(client)
+    with pytest.raises(AdsbdbTimeoutError):
+        run(service, "4b1805", None)

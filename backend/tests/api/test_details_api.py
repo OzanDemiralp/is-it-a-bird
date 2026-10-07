@@ -35,6 +35,25 @@ def test_unknown_data_is_200_with_nulls_not_an_error(details_api):
     assert resp.json() == {"route": None, "aircraft": None}
 
 
+def test_partial_details_returns_200_with_available_data(details_api):
+    client, _ = details_api(AircraftDetails(aircraft=AircraftInfo(registration="HB-JCN")))
+    resp = client.get("/aircraft/4b1805/details")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "route": None,
+        "aircraft": {
+            "type": None,
+            "icao_type": None,
+            "manufacturer": None,
+            "registration": "HB-JCN",
+            "owner": None,
+            "owner_country": None,
+            "photo_url": None,
+            "photo_thumbnail_url": None,
+        },
+    }
+
+
 def test_passes_position_and_speed_through(details_api):
     client, service = details_api(FOUND)
     client.get(
