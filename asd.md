@@ -1,68 +1,85 @@
-# Project: "Is It A Bird?" (is-it-a-bird)
+# Task: Device orientation (sensor) layer for "Is It A Bird?"
 
-## Concept
-A mobile-first web app (PWA) that answers: "What is that aircraft flying over me right now?"
-The user opens the app, shares their location, and points their phone at the sky. The app
-fetches live ADS-B data for nearby aircraft, computes where each aircraft appears in the sky
-relative to the user (azimuth, elevation, distance), and matches that against the direction
-the phone is facing. Eventually it will show a label with callsign, route, and aircraft type
-on top of the camera feed.
+## Context
+This project is a mobile-first web app that tells the user which aircraft they are pointing
+their phone at. The backend (FastAPI) and the geometry/ranking logic on the frontend
+(`geo/`, `skyService`, `candidateService`) already exist and are tested. What is missing is
+the part that tells the app **where the phone is pointing**.
 
-This prompt covers ONLY the first steps. Do not build the full app.
+Inspect the repo first and follow its existing structure, naming, and testing style.
 
-## Existing skeleton (already in the repo, do not recreate)
-- /backend: FastAPI app (`app/main.py`) with CORS middleware and a `/health` endpoint,
-  `requirements.txt`, a `.venv`.
-- /frontend: Vite + TypeScript project (package.json, tsconfig files, eslint config, src/, public/).
-- Root `.gitignore` and a `frontend/.gitignore`.
-Inspect the repo first and work with what is there. Match the existing structure and style.
+The goal of this task is to build the sensor layer so that all device-specific behavior
+(iOS vs Android, permissions, compass quirks) is isolated in one place, and everything else
+in the app only sees a clean, device-independent pose.
 
-## Target architecture (for context)
-- Frontend (TypeScript): all geometry runs client-side as pure functions, because later the
-  app will extrapolate aircraft positions several times per second. Sensors (Geolocation,
-  DeviceOrientation, camera) come later.
-- Backend (FastAPI): a thin proxy that fetches aircraft states from OpenSky Network for a
-  bounding box, caches the result for a few seconds (short TTL) to respect rate limits, and
-  returns a clean typed JSON response. Credentials/config go in `.env`, never in code.
+## Core design
 
-## Scope of this task (do these, in order)
+### 1. A single abstraction: `OrientationProvider`
+Create a module (e.g. `frontend/src/sensors/`) exposing an interface roughly like:
 
-### Step 1: Geometry module (frontend, no UI, no network)
-Create `frontend/src/geo/` with pure, well-typed functions:
-- WGS84 geodetic (lat, lon, altitude in meters) -> ECEF
-- ECEF difference -> local ENU (East-North-Up) relative to an observer
-- `azimuthElevation(observer, target)` returning azimuth (degrees clockwise from true north,
-  normalized to 0-360), elevation (degrees above the horizon), and slant range (meters)
-Set up Vitest and write unit tests with hand-verifiable cases (e.g. target directly north at
-the same altitude, directly overhead, directly east, target below the horizon, and one
-realistic case). Do not guess expected values; derive them and note how in the test comments.
+- `start()` / `stop()`
+- `subscribe(callback)` that emits a **camera pointing direction**:
+  - `azimuthDeg`: degrees clockwise from **true north**, 0-360
+  - `elevationDeg`: degrees above the horizon, -90 to 90
+  - `timestamp`
+  - optional `accuracyHint` (if the platform provides one)
 
-### Step 2: Aircraft endpoint (backend)
-Add `GET /aircraft?lat=&lon=&radius_km=` that:
-- converts the center point and radius into a lat/lon bounding box,
-- queries the OpenSky Network states API for that box (check the official docs for the current
-  endpoint, parameters, state-vector field order, and anonymous rate limits; do not rely on
-  memory),
-- maps the result into Pydantic models (icao24, callsign, lat, lon, altitude, velocity,
-  heading, vertical rate, on_ground, last contact timestamp) and handles null fields,
-- caches responses in memory with a short TTL, keyed by a rounded bounding box,
-- fails gracefully (clear HTTP error, no crash) when OpenSky is unavailable or rate limited.
-Add a couple of tests with the OpenSky call mocked.
+The rest of the app must not know which platform produced the values.
 
-### Step 3: Small housekeeping
-- Replace `allow_origins=["*"]` + `allow_credentials=True` with a sensible dev config
-  (no credentials are used) and make allowed origins configurable via env.
-- Add a Vite dev proxy so the frontend can call `/api/*` without CORS issues.
-- Make sure `.venv/`, `__pycache__/`, and `.env` are git-ignored; add `.env.example`.
+### 2. Implementations behind that interface
+- **iOS provider:** needs the explicit permission request
+  (`DeviceOrientationEvent.requestPermission()`, which must be triggered by a user gesture)
+  and its own way of reading compass heading.
+- **Android / absolute provider:** uses the absolute orientation event.
+- **Fake provider:** emits scripted or manually controlled values, for tests and for
+  desktop development.
+- A small factory that picks the right one at runtime and reports a clear status
+  when sensors are unavailable or permission is denied.
 
-## Explicitly OUT of scope for now
-Camera overlay, device orientation/compass handling, dead-reckoning extrapolation, route or
-aircraft-type enrichment, PWA setup, deployment, auth, and any real UI beyond what is needed
-to verify the above. Do not add these even as stubs.
+Do not rely on memory for the exact event names, fields, and permission flow on each
+platform. Check current MDN / platform documentation and state in comments what each
+provider assumes (for example whether the heading is relative to magnetic or true north).
+
+### 3. Pointing direction from device rotation
+Do **not** interpret alpha/beta/gamma directly as azimuth/elevation. When a phone is held
+upright toward the sky, Euler angles behave badly. Instead:
+- convert the device rotation to a rotation matrix or quaternion,
+- take the direction the **rear camera** looks along (the device's negative Z axis),
+- express it in the local East-North-Up frame, then derive azimuth/elevation from it,
+- account for screen orientation (portrait vs landscape).
+
+Put this math in pure functions with unit tests (known orientations in, expected
+azimuth/elevation out; derive expected values by hand and note how in test comments).
+
+### 4. Magnetic declination correction
+Phone compasses report relative to magnetic north, while the aircraft azimuth in
+`geo/` is relative to true north. Add a small module that, given the observer's
+latitude/longitude (and date), returns the magnetic declination, and apply it so the
+provider output is relative to true north.
+Check what approach fits (a World Magnetic Model library vs a simple lookup). **Ask before
+adding any dependency**, and explain the trade-off briefly.
+
+### 5. Record and replay (debug mode)
+Add a hidden debug mode (e.g. enabled with a query parameter) that:
+- records the raw sensor stream plus observer position to a JSON file the user can download,
+- can replay such a file through a `ReplayProvider` implementing the same interface.
+The purpose: capture real-world phone data once, then reuse it in tests and development.
+
+### 6. Minimal UI to verify it
+A very small debug screen is enough: a "Start sensors" button (to satisfy the user-gesture
+requirement), live readout of azimuth / elevation, the active provider, permission/status,
+and the record/replay controls. Do not build the camera overlay.
+
+## Out of scope for now
+Camera feed and AR overlay, dead-reckoning extrapolation of aircraft positions, manual
+calibration offset, PWA/service worker setup, deployment, any backend changes.
 
 ## Working style
-- Ask before adding any new dependency beyond Vitest and the minimal HTTP/test libraries.
-- Keep changes small and reviewable; explain what you changed after each step.
-- Prefer clarity over cleverness; I should be able to explain
-  every part of it.
-- Stop after Step 3 and summarize what is done and what the natural next step would be.
+- Small, reviewable commits, one logical step each: interface + fake provider, pose math +
+  tests, platform providers, declination, record/replay, debug screen.
+- Ask before adding dependencies.
+- Keep code readable; this is a portfolio project and I need to explain every part of it
+  in interviews.
+- Note anything you could not verify without a real device, so I can test it manually.
+- Stop at the end and summarize what is done, what needs on-device testing, and what the
+  natural next step is.

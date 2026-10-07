@@ -3,12 +3,20 @@ import './App.css'
 import { ApiError } from './api/errors'
 import { AircraftTable } from './components/AircraftTable'
 import { ObserverForm, type ObserverInput } from './components/ObserverForm'
+import { SensorDebug } from './components/SensorDebug'
 import { fetchSky, type SkyAircraft } from './services/skyService'
 
 // Starting values for the verification form (Zurich Airport); editable in the UI.
 const INITIAL_OBSERVER: ObserverInput = { lat: 47.4647, lon: 8.5492, alt: 430, radiusKm: 50 }
 
+// Hidden debug mode: open the app with ?debug=sensors.
+const SENSOR_DEBUG = new URLSearchParams(window.location.search).get('debug') === 'sensors'
+
 function App() {
+  return SENSOR_DEBUG ? <SensorDebug /> : <SkyView />
+}
+
+function SkyView() {
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<SkyAircraft[] | null>(null)
   const [error, setError] = useState<string | null>(null)
